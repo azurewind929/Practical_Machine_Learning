@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="UTF-8">
+    <title>Practical machine learning by azurewind929</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" href="stylesheets/normalize.css" media="screen">
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/github-light.css" media="screen">
+  </head>
+  <body>
+    <section class="page-header">
+      <h1 class="project-name">Practical machine learning</h1>
+      <h2 class="project-tagline">Coursera course Practical Machine Learning by JHU</h2>
+      <a href="https://github.com/azurewind929/Practical_Machine_Learning" class="btn">View on GitHub</a>
+      <a href="https://github.com/azurewind929/Practical_Machine_Learning/zipball/master" class="btn">Download .zip</a>
+      <a href="https://github.com/azurewind929/Practical_Machine_Learning/tarball/master" class="btn">Download .tar.gz</a>
+    </section>
+
+    <section class="main-content">
+      <hr>
+
+<p>title: "Prediction assessment write up"</p>
+
+<h2>
+<a id="output-html_document" class="anchor" href="#output-html_document" aria-hidden="true"><span class="octicon octicon-link"></span></a>output: html_document</h2>
+
+<p>This is the writeup for the coursera course machine learning. The datasets are obtained at the following websites on May 18, 2015. 
+training set: 
+<a href="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv">https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv</a>
+testing set:
+<a href="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv">https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv</a></p>
+
+<p>First of all, I loaded the training dataset, and splitted them into train and test subsets in order to perform cross-validation. </p>
+
+<div class="highlight highlight-r"><pre>library(<span class="pl-smi">caret</span>)
+set.seed(<span class="pl-c1">1</span>)
+<span class="pl-smi">pmltrain</span><span class="pl-k">&lt;-</span> read.csv(<span class="pl-s"><span class="pl-pds">"</span>pml-training.csv<span class="pl-pds">"</span></span>, <span class="pl-v">na.strings</span><span class="pl-k">=</span>c(<span class="pl-s"><span class="pl-pds">"</span>NA<span class="pl-pds">"</span></span>, <span class="pl-s"><span class="pl-pds">"</span>#DIV/0!<span class="pl-pds">"</span></span>))
+<span class="pl-smi">intrain</span><span class="pl-k">&lt;-</span> createDataPartition(<span class="pl-v">y</span><span class="pl-k">=</span><span class="pl-smi">pmltrain</span><span class="pl-k">$</span><span class="pl-smi">classe</span>, <span class="pl-v">p</span><span class="pl-k">=</span><span class="pl-c1">0.7</span>, <span class="pl-v">list</span><span class="pl-k">=</span><span class="pl-c1">F</span>)
+<span class="pl-smi">train</span><span class="pl-k">&lt;-</span> <span class="pl-smi">pmltrain</span>[<span class="pl-smi">intrain</span>,]
+<span class="pl-smi">test</span><span class="pl-k">&lt;-</span> <span class="pl-smi">pmltrain</span>[<span class="pl-k">-</span><span class="pl-smi">intrain</span>,]
+<span class="pl-smi">trainx</span><span class="pl-k">&lt;-</span><span class="pl-smi">train</span>[,<span class="pl-k">-</span><span class="pl-c1">160</span>]
+<span class="pl-smi">trainy</span><span class="pl-k">&lt;-</span> <span class="pl-smi">train</span>[,<span class="pl-c1">160</span>]
+<span class="pl-smi">testx</span><span class="pl-k">&lt;-</span> <span class="pl-smi">test</span>[,<span class="pl-k">-</span><span class="pl-c1">160</span>]
+<span class="pl-smi">testy</span><span class="pl-k">&lt;-</span> <span class="pl-smi">test</span>[,<span class="pl-c1">160</span>]</pre></div>
+
+<p>For pre-processing, I did three things to simplify the model fitting part. First of all, since many variables have extensive NAs, I got rid of these variables. Secondely, I eliminated the variables with near zero variance. In addition, I discarded the obvious irrelavent variables such as username and timestamp. Also, by analysis of correlation, we can see some of the variables are highly correlated, I removed them as well.</p>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">trainx1</span><span class="pl-k">&lt;-</span> <span class="pl-smi">trainx</span>[, colSums(is.na(<span class="pl-smi">trainx</span>))<span class="pl-k">&lt;</span><span class="pl-c1">10000</span>] <span class="pl-c">#discard the varialbes with too many NAs</span>
+<span class="pl-smi">trainx2</span><span class="pl-k">&lt;-</span> <span class="pl-smi">trainx1</span>[, <span class="pl-k">-</span>nearZeroVar(<span class="pl-smi">trainx1</span>)] <span class="pl-c">#delete variables with little variance</span>
+<span class="pl-smi">trainx3</span><span class="pl-k">&lt;-</span> <span class="pl-smi">trainx2</span>[,<span class="pl-k">-</span>c(<span class="pl-c1">1</span>,<span class="pl-c1">2</span>,<span class="pl-c1">5</span>)] <span class="pl-c">#remove username, timestamp and the sample number</span>
+<span class="pl-smi">correlations</span><span class="pl-k">&lt;-</span> cor(<span class="pl-smi">trainx3</span>)
+library(<span class="pl-smi">corrplot</span>)
+corrplot(<span class="pl-smi">correlations</span>, <span class="pl-v">order</span><span class="pl-k">=</span><span class="pl-s"><span class="pl-pds">"</span>hclust<span class="pl-pds">"</span></span>, <span class="pl-v">tl.cex</span><span class="pl-k">=</span>.<span class="pl-c1">5</span>, <span class="pl-v">title</span><span class="pl-k">=</span><span class="pl-s"><span class="pl-pds">"</span>Correlation of variables<span class="pl-pds">"</span></span>)</pre></div>
+
+<p><img src="figure/unnamed-chunk-2-1.png" alt="plot of chunk unnamed-chunk-2"> </p>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">highCor</span><span class="pl-k">&lt;-</span> findCorrelation(<span class="pl-smi">correlations</span>, <span class="pl-v">cutoff</span><span class="pl-k">=</span><span class="pl-c1">0.75</span>)
+<span class="pl-smi">trainx4</span><span class="pl-k">&lt;-</span> <span class="pl-smi">trainx3</span>[,<span class="pl-k">-</span><span class="pl-smi">highCor</span>] <span class="pl-c">#remove highly correlated variables</span></pre></div>
+
+<p>After the pre-process, I can fit the model using random forest classification. </p>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">model</span><span class="pl-k">&lt;-</span> train(<span class="pl-smi">trainy</span><span class="pl-k">~</span>., <span class="pl-v">data</span><span class="pl-k">=</span><span class="pl-smi">trainx4</span>, <span class="pl-v">method</span><span class="pl-k">=</span><span class="pl-s"><span class="pl-pds">"</span>rf<span class="pl-pds">"</span></span>)</pre></div>
+
+<p>Here I get the model I want, 'r model'. I would like to apply it to the validation subset that I generated at the beginning of this assignment, to see how does the model work. </p>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">prediction</span><span class="pl-k">&lt;-</span> predict(<span class="pl-smi">model</span>, <span class="pl-smi">testx</span>)
+table(<span class="pl-v">prediction</span><span class="pl-k">=</span><span class="pl-smi">prediction</span>, <span class="pl-v">true</span><span class="pl-k">=</span><span class="pl-smi">testy</span>)</pre></div>
+
+<pre><code>##           true
+## prediction    A    B    C    D    E
+##          A 1674    1    0    0    0
+##          B    0 1138    2    0    0
+##          C    0    0 1024    0    0
+##          D    0    0    0  964    2
+##          E    0    0    0    0 1080
+</code></pre>
+
+<p>From the confusion matrix we can see that the model did a good job on the validation data subset. </p>
+
+<p>For the real test data, I picked the variables that I fitted for the model and then did prediction on them: </p>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">pmltest</span><span class="pl-k">&lt;-</span> read.csv(<span class="pl-s"><span class="pl-pds">"</span>pml-testing.csv<span class="pl-pds">"</span></span>)
+<span class="pl-smi">pmltestx</span><span class="pl-k">&lt;-</span> <span class="pl-smi">pmltest</span>[,<span class="pl-k">-</span><span class="pl-c1">160</span>]
+<span class="pl-smi">prediction2</span><span class="pl-k">&lt;-</span> predict(<span class="pl-smi">model</span>, <span class="pl-smi">pmltestx</span>)
+<span class="pl-smi">prediction2</span></pre></div>
+
+<pre><code>##  [1] B A B A A E D B A A B C B A E E A B B B
+## Levels: A B C D E
+</code></pre>
+
+<p>Here I got the final test result that I want. I would then submit them in the format required. </p>
+
+<div class="highlight highlight-r"><pre><span class="pl-en">pml_write_files</span><span class="pl-k">&lt;-</span> <span class="pl-k">function</span>(<span class="pl-smi">x</span>) {
+  <span class="pl-v">n</span><span class="pl-k">=</span>length(<span class="pl-smi">x</span>)
+  <span class="pl-k">for</span>(<span class="pl-smi">i</span> <span class="pl-k">in</span> <span class="pl-c1">1</span><span class="pl-k">:</span><span class="pl-smi">n</span>) {
+    <span class="pl-v">filename</span><span class="pl-k">=</span>paste0(<span class="pl-s"><span class="pl-pds">"</span>problem_id_<span class="pl-pds">"</span></span>,<span class="pl-smi">i</span>,<span class="pl-s"><span class="pl-pds">"</span>.txt<span class="pl-pds">"</span></span>)
+    write.table(<span class="pl-smi">x</span>[<span class="pl-smi">i</span>], <span class="pl-v">file</span><span class="pl-k">=</span><span class="pl-smi">filename</span>,<span class="pl-v">quote</span><span class="pl-k">=</span><span class="pl-c1">F</span>, <span class="pl-v">row.names</span><span class="pl-k">=</span><span class="pl-c1">F</span>, <span class="pl-v">col.names</span><span class="pl-k">=</span><span class="pl-c1">F</span>)
+  }
+}
+pml_write_files(<span class="pl-smi">prediction2</span>)</pre></div>
+
+<p>Finally, I generated the markdown file using knitr. </p>
+
+      <footer class="site-footer">
+        <span class="site-footer-owner"><a href="https://github.com/azurewind929/Practical_Machine_Learning">Practical machine learning</a> is maintained by <a href="https://github.com/azurewind929">azurewind929</a>.</span>
+
+        <span class="site-footer-credits">This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the <a href="https://github.com/jasonlong/cayman-theme">Cayman theme</a> by <a href="https://twitter.com/jasonlong">Jason Long</a>.</span>
+      </footer>
+
+    </section>
+
+  
+  </body>
+</html>
+
